@@ -1,0 +1,91 @@
+# SPDX-License-Identifier: Apache-2.0
+# Sylva management cluster: 3 bare-metal control-plane nodes (HA), no workers
+cluster_virtual_ip: 10.0.0.10            # API VIP, outside the node IP range below
+
+cluster:
+  capi_providers:
+    infra_provider: capm3
+    bootstrap_provider: cabpr
+  control_plane_replicas: 3
+  machine_deployments: {}
+
+  rke2:
+    additionalUserData:
+      config:
+        users:
+          - name: sylva-user
+            groups: users,sylva-ops
+            sudo: ALL=(ALL) NOPASSWD:ALL
+            shell: /bin/bash
+            ssh_authorized_keys:
+              - ssh-ed25519 AAAA... CHANGE_ME
+
+  capm3:
+    os_image_selector:
+      os: ubuntu
+      os-release: noble                 # Sylva labels Ubuntu 24.04 images "noble"
+      hardened: true
+    networks:
+      primary:
+        subnet: 10.0.0.0/24
+        gateway: 10.0.0.1
+        start: 10.0.0.11
+        end: 10.0.0.13
+    dns_servers: [10.0.0.1]
+
+  control_plane:
+    capm3:
+      hostSelector:
+        matchLabels:
+          cluster-role: control-plane
+      networks:
+        primary:
+          interface: eno1
+    network_interfaces:
+      eno1:
+        type: phy
+
+  baremetal_host_default:
+    bmh_spec:
+      bmc:
+        disableCertificateVerification: true
+      bootMode: UEFI
+      rootDeviceHints:
+        deviceName: /dev/sda
+
+  baremetal_hosts:
+    mgmt-1:
+      longhorn_disk_config:               # dedicated data disk (not the OS disk), CHANGE_ME
+        - path: /var/longhorn/disks/sdb
+          storageReserved: 0
+          allowScheduling: true
+      bmh_metadata: {labels: {cluster-role: control-plane}}
+      bmh_spec:
+        bmc: {address: redfish-virtualmedia://10.0.1.11/redfish/v1/Systems/1}
+        bootMACAddress: aa:bb:cc:00:00:11
+    mgmt-2:
+      longhorn_disk_config:               # dedicated data disk (not the OS disk), CHANGE_ME
+        - path: /var/longhorn/disks/sdb
+          storageReserved: 0
+          allowScheduling: true
+      bmh_metadata: {labels: {cluster-role: control-plane}}
+      bmh_spec:
+        bmc: {address: redfish-virtualmedia://10.0.1.12/redfish/v1/Systems/1}
+        bootMACAddress: aa:bb:cc:00:00:12
+    mgmt-3:
+      longhorn_disk_config:               # dedicated data disk (not the OS disk), CHANGE_ME
+        - path: /var/longhorn/disks/sdb
+          storageReserved: 0
+          allowScheduling: true
+      bmh_metadata: {labels: {cluster-role: control-plane}}
+      bmh_spec:
+        bmc: {address: redfish-virtualmedia://10.0.1.13/redfish/v1/Systems/1}
+        bootMACAddress: aa:bb:cc:00:00:13
+
+metal3:
+  bootstrap_ip: 10.0.0.5                  # IP of the bootstrap VM
+
+proxies:
+  http_proxy: ""
+  https_proxy: ""
+  no_proxy: ""

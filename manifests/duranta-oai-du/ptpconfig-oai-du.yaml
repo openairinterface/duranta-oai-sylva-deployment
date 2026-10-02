@@ -1,0 +1,35 @@
+# SPDX-License-Identifier: MIT
+# Ordinary clock (client only) with the ptp4l/phc2sys settings from the OAI FHI 7.2 tutorial.
+# ens1f1 = the DU's PTP port as the OS names it. Find it with:
+#   kubectl -n openshift-ptp get nodeptpdevices -o yaml   (lists PTP-capable ports per node)
+# and put the same name in `interface` and in the [ens1f1] section below.
+apiVersion: ptp.openshift.io/v1
+kind: PtpConfig
+metadata:
+  name: duranta-oai-du-oc
+  namespace: openshift-ptp
+spec:
+  profile:
+    - name: duranta-oai-du
+      interface: ens1f1                   # CHANGE_ME
+      ptp4lOpts: "-2"
+      phc2sysOpts: "-a -r -r -n 24 -m -R 8"
+      ptpSchedulingPolicy: SCHED_FIFO
+      ptpSchedulingPriority: 10
+      ptp4lConf: |
+        [global]
+        domainNumber            24
+        clientOnly              1
+        time_stamping           hardware
+        tx_timestamp_timeout    50
+        logging_level           6
+        summary_interval        0
+
+        [ens1f1]
+        network_transport       L2
+        hybrid_e2e              0
+  recommend:
+    - profile: duranta-oai-du
+      priority: 4
+      match:
+        - nodeLabel: oai.ran/du

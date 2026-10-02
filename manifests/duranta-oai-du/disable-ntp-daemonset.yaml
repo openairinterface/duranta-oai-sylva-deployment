@@ -1,0 +1,44 @@
+# SPDX-License-Identifier: MIT
+# Stops host NTP (systemd-timesyncd / chrony) on DU nodes so only phc2sys sets the system clock
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: oai-host-config
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: disable-ntp
+  namespace: oai-host-config
+spec:
+  selector:
+    matchLabels: {app: disable-ntp}
+  template:
+    metadata:
+      labels: {app: disable-ntp}
+    spec:
+      nodeSelector:
+        oai.ran/du: "true"
+      hostPID: true
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: disable-ntp
+          image: ubuntu:24.04
+          securityContext:
+            privileged: true
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              nsenter -t 1 -m -u -i -n -p -- sh -c '
+                timedatectl set-ntp false
+                for s in systemd-timesyncd chrony chronyd ntp; do
+                  systemctl disable --now $s 2>/dev/null || true
+                  systemctl mask $s 2>/dev/null || true
+                done
+                timedatectl | grep -i "NTP service"'
+              sleep infinity
+          resources:
+            requests: {cpu: 10m, memory: 16Mi}

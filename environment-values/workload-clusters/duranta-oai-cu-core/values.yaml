@@ -1,0 +1,72 @@
+# SPDX-License-Identifier: Apache-2.0
+# Core + CU workload cluster: OAI 5G Core and the Duranta/OAI CU on 1 bare-metal node (no real-time tuning needed)
+cluster_virtual_ip: 10.0.0.20
+
+units:
+  multus:
+    enabled: true                         # extra pod interfaces: F1 (CU-DU), N3/N6 (UPF)
+  longhorn:
+    enabled: false                        # single node, no spare disk: local-path becomes the default StorageClass
+
+cluster:
+  capi_providers:
+    infra_provider: capm3
+    bootstrap_provider: cabpr
+  control_plane_replicas: 1
+  machine_deployments: {}
+
+  rke2:
+    additionalUserData:
+      config:
+        users:
+          - name: sylva-user
+            groups: users,sylva-ops
+            sudo: ALL=(ALL) NOPASSWD:ALL
+            shell: /bin/bash
+            ssh_authorized_keys:
+              - ssh-ed25519 AAAA... CHANGE_ME
+
+  capm3:
+    os_image_selector:
+      os: ubuntu
+      os-release: noble                 # Sylva labels Ubuntu 24.04 images "noble"
+      hardened: true
+    networks:
+      primary:
+        subnet: 10.0.0.0/24
+        gateway: 10.0.0.1
+        start: 10.0.0.21
+        end: 10.0.0.21
+    dns_servers: [10.0.0.1]
+
+  control_plane:
+    capm3:
+      hostSelector:
+        matchLabels:
+          cluster-role: core
+      networks:
+        primary:
+          interface: eno1
+    network_interfaces:
+      eno1:
+        type: phy
+
+  baremetal_host_default:
+    bmh_spec:
+      bmc:
+        disableCertificateVerification: true
+      bootMode: UEFI
+      rootDeviceHints:
+        deviceName: /dev/sda
+
+  baremetal_hosts:
+    core-1:
+      bmh_metadata: {labels: {cluster-role: core}}
+      bmh_spec:
+        bmc: {address: redfish-virtualmedia://10.0.1.21/redfish/v1/Systems/1}
+        bootMACAddress: aa:bb:cc:00:00:21
+
+proxies:
+  http_proxy: ""
+  https_proxy: ""
+  no_proxy: ""

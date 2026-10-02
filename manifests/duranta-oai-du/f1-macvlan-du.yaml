@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: MIT
+# F1 interface for the DU pod (DU cluster), on the same L2 network as the CU's F1 address (10.0.0.120).
+# Attach with pod annotation: k8s.v1.cni.cncf.io/networks: oai-f1
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  name: oai-f1
+  namespace: oai
+spec:
+  config: |
+    {
+      "cniVersion": "0.3.1",
+      "type": "macvlan",
+      "master": "eno1",
+      "mode": "bridge",
+      "ipam": {"type": "static", "addresses": [{"address": "10.0.0.130/24"}]}
+    }

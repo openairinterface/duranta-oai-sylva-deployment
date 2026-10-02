@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: MIT
+# Fronthaul network for the DU pod (OAI: vlan, spoofchk off, trust on). MAC is set per pod in its network annotation.
+apiVersion: sriovnetwork.openshift.io/v1
+kind: SriovNetwork
+metadata:
+  name: oai-fh
+  namespace: cattle-sriov-system
+spec:
+  resourceName: oai_fh
+  networkNamespace: oai
+  vlan: 4                                 # CHANGE_ME: fronthaul VLAN
+  spoofChk: "off"
+  trust: "on"
+  ipam: "{}"

@@ -1,0 +1,42 @@
+# SPDX-License-Identifier: MIT
+# ptp-operator for the DU cluster (namespace openshift-ptp) on plain Kubernetes / RKE2.
+# Apply with: kubectl apply -k manifests/duranta-oai-du/ptp-operator
+# Fixes three things upstream assumes from OpenShift; see README section 6.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - upstream-ptp-operator.yaml
+  - certificates.yaml
+images:
+  # Upstream references ptp-operator:5.0, which is not published; pin the community build of commit 4c9223a.
+  - name: ghcr.io/k8snetworkplumbingwg/ptp-operator
+    digest: sha256:90fdd78c66aa1c0b45294c6dd2119ddd2a5872f9e91953a63770a39ac5c3f9b8
+patches:
+  # 1. Upstream pins the operator to nodes labelled node-role.kubernetes.io/master="" (OpenShift); RKE2 does not match.
+  - target: {kind: Deployment, name: ptp-operator}
+    patch: |
+      - op: remove
+        path: /spec/template/spec/nodeSelector
+  # 2. Upstream's daemon image quay.io/openshift/origin-ptp:5.0 does not exist; use the community linuxptp-daemon
+  #    build of commit 288f5c7 (2026-09-30), pinned by digest.
+  - target: {kind: Deployment, name: ptp-operator}
+    patch: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: ptp-operator
+      spec:
+        template:
+          spec:
+            containers:
+              - name: ptp-operator
+                env:
+                  - name: LINUXPTP_DAEMON_IMAGE
+                    value: ghcr.io/k8snetworkplumbingwg/linuxptp-daemon@sha256:23c70f68c31096a648064e6e3ad2bf534e72ecd2e7acfce1458fd93bc53e5c48
+  # 3. Let cert-manager inject the webhook CA bundle (upstream relies on OpenShift's service-ca).
+  - target: {kind: ValidatingWebhookConfiguration, name: ptpconfig-validating-webhook-configuration}
+    patch: |
+      - op: add
+        path: /metadata/annotations
+        value:
+          cert-manager.io/inject-ca-from: openshift-ptp/ptp-webhook-cert

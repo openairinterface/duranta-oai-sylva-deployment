@@ -1,0 +1,51 @@
+# SPDX-License-Identifier: MIT
+# Validates the guide against Sylva 1.7.6, then builds README.md with MkDocs Material and publishes it to GitHub Pages
+# (https://<owner>.github.io/<repo>/). Requires Settings -> Pages -> Source: "GitHub Actions".
+name: Validate and publish
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check out sylva-core 1.7.6
+        run: git clone --depth 1 --branch 1.7.6 https://gitlab.com/sylva-projects/sylva-core.git "$RUNNER_TEMP/sylva-core"
+      - name: Install PyYAML
+        run: pip install pyyaml
+      - name: Run validate.sh (with CRD checks in kind)
+        run: KIND=1 ./validate.sh "$RUNNER_TEMP/sylva-core"
+
+  publish:
+    needs: validate
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: true
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - name: Build site (MkDocs Material)
+        run: |
+          pip install -r docs-requirements.txt
+          ./docs.sh build
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .site/out
+      - id: deployment
+        uses: actions/deploy-pages@v4

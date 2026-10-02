@@ -1,0 +1,51 @@
+# SPDX-License-Identifier: MIT
+# GitHub Pages site for this guide, built with MkDocs Material from README.md.
+# Build: ./docs.sh build   (preview: ./docs.sh serve)
+site_name: Sylva for Duranta/OAI
+site_description: Deploy a Duranta/OAI DU cluster and a Core + CU cluster with Sylva on bare metal
+site_url: https://openairinterface.github.io/duranta-oai-sylva-deployment/
+repo_url: https://github.com/openairinterface/duranta-oai-sylva-deployment
+repo_name: duranta-oai-sylva-deployment
+edit_uri: edit/main/README.md
+docs_dir: .site/docs        # filled by docs.sh: README.md becomes index.md, YAML files are copied for download
+site_dir: .site/out
+
+theme:
+  name: material
+  icon:
+    logo: material/antenna
+    repo: fontawesome/brands/github
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: deep orange
+      toggle: {icon: material/weather-night, name: Dark mode}
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: deep orange
+      toggle: {icon: material/weather-sunny, name: Light mode}
+  features:
+    - toc.integrate          # table of contents in the left sidebar
+    - toc.follow
+    - navigation.top         # "back to top" button
+    - search.highlight
+    - content.code.copy      # copy button on every code block
+    - content.tooltips
+
+markdown_extensions:
+  - tables
+  - attr_list
+  - md_in_html
+  - admonition
+  - toc:
+      permalink: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format

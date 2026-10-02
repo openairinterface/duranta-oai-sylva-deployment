@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: MIT
+
+# Repositories the guide tells you to clone next to it
+/sylva-core/
+/ptp-operator/
+_free-run/
+
+# Cluster credentials: never commit these
+*kubeconfig*
+
+# Editors, OS, Python
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+__pycache__/
+
+# Site build output (./docs.sh)
+.site/

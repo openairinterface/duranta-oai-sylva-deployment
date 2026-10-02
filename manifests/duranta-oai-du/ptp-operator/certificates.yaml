@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: MIT
+# TLS certificates that OpenShift's service-ca would create automatically, issued here by cert-manager (deployed by Sylva):
+#   webhook-server-cert     ptp-operator admission webhook
+#   linuxptp-daemon-secret  metrics endpoint (kube-rbac-proxy) of the linuxptp-daemon pods
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: ptp-selfsigned
+  namespace: openshift-ptp
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: ptp-webhook-cert
+  namespace: openshift-ptp
+spec:
+  secretName: webhook-server-cert
+  dnsNames:
+    - webhook-service.openshift-ptp.svc
+    - webhook-service.openshift-ptp.svc.cluster.local
+  issuerRef:
+    kind: Issuer
+    name: ptp-selfsigned
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: ptp-monitor-cert
+  namespace: openshift-ptp
+spec:
+  secretName: linuxptp-daemon-secret
+  dnsNames:
+    - ptp-monitor-service.openshift-ptp.svc
+    - ptp-monitor-service.openshift-ptp.svc.cluster.local
+  issuerRef:
+    kind: Issuer
+    name: ptp-selfsigned

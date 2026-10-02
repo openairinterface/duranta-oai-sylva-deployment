@@ -1,0 +1,156 @@
+# SPDX-License-Identifier: Apache-2.0
+# DU workload cluster: 1 control-plane node + 1 Duranta/OAI DU worker (O-RAN 7.2 fronthaul, real-time Ubuntu)
+cluster_virtual_ip: 10.0.0.30
+
+units:
+  multus:
+    enabled: true
+  longhorn:
+    enabled: false                        # single node, no spare disk: local-path becomes the default StorageClass
+
+ntp:
+  enabled: false                          # PTP owns the clock on the DU (manifests/duranta-oai-du/disable-ntp-daemonset.yaml)
+
+# SR-IOV VFs on the fronthaul NIC, bound to vfio-pci for DPDK
+sriov:
+  node_policies:
+    oai-fh:
+      resourceName: oai_fh
+      numVfs: 2
+      deviceType: vfio-pci
+      nodeSelector:
+        oai.ran/du: "true"
+      nicSelector:
+        pfNames: [ens1f0]                 # CHANGE_ME: fronthaul port name, from the BMH inspection data (see the tutorial)
+
+cluster:
+  capi_providers:
+    infra_provider: capm3
+    bootstrap_provider: cabpr
+  control_plane_replicas: 1
+
+  rke2:
+    additionalUserData:
+      config:
+        users:
+          - name: sylva-user
+            groups: users,sylva-ops
+            sudo: ALL=(ALL) NOPASSWD:ALL
+            shell: /bin/bash
+            ssh_authorized_keys:
+              - ssh-ed25519 AAAA... CHANGE_ME
+
+  capm3:
+    os_image_selector:
+      os: ubuntu
+      os-release: noble                 # Sylva labels Ubuntu 24.04 images "noble"
+      hardened: true                      # Sylva only publishes hardened Ubuntu RKE2 images
+    networks:
+      primary:
+        subnet: 10.0.0.0/24
+        gateway: 10.0.0.1
+        start: 10.0.0.31
+        end: 10.0.0.32
+    dns_servers: [10.0.0.1]
+
+  # Tuning from the OAI FHI 7.2 tutorial, for a 32-core server with hyper-threading OFF in BIOS.
+  # CPUs 0-3: OS, IRQs, kubelet. CPUs 4-31: isolated for the DU (L1/DPDK).
+  node_classes:
+    ran-du:
+      non_hugepages_minimum_memory_gb: 16
+      kernel_cmdline:
+        hugepages:                        # OAI: hugepagesz=2M hugepages=0 default_hugepagesz=1G hugepagesz=1G hugepages=20
+          enabled: true
+          hugepagesz_2M: 0
+          hugepagesz_1G: 20
+          default_size: 1G
+        # OAI kernel args. processor/intel_idle max_cstate replace `cpupower idle-set -D 0` (persistent, no extra package)
+        extra_options: >-
+          isolcpus=domain,4-31 nohz_full=4-31 rcu_nocbs=4-31 irqaffinity=0,1,2,3
+          intel_iommu=on iommu=pt intel_pstate=disable
+          processor.max_cstate=1 intel_idle.max_cstate=0
+      kubelet_extra_args: {}              # required by the node_classes schema, even when empty
+      kubelet_config_file_options:
+        cpuManagerPolicy: static          # DU pods get exclusive CPUs from 4-31
+        reservedSystemCPUs: "0-3"
+        topologyManagerPolicy: single-numa-node
+        topologyManagerScope: pod
+      nodeTaints: {}
+      nodeLabels:
+        oai.ran/du: "true"
+      nodeAnnotations: {}
+      additional_commands:
+        pre_bootstrap_commands:
+          # OAI /etc/sysctl.d/rt.conf
+          - printf 'kernel.sched_rt_runtime_us=-1\nkernel.timer_migration=0\n' > /etc/sysctl.d/rt.conf && sysctl --system
+          # Real-time kernel (linux-realtime, Ubuntu 24.04 universe). Reboots once; cloud-init then reruns and skips this.
+          - |
+            if ! uname -r | grep -q realtime; then
+              apt-get update
+              DEBIAN_FRONTEND=noninteractive apt-get install -y linux-realtime
+              KVER=$(ls /boot/vmlinuz-*realtime | sort -V | tail -1 | sed 's|/boot/vmlinuz-||')
+              sed -i "s|^GRUB_DEFAULT=.*|GRUB_DEFAULT=\"Advanced options for Ubuntu>Ubuntu, with Linux ${KVER}\"|" /etc/default/grub
+              update-grub
+              cloud-init clean --reboot
+              sleep 86400
+            fi
+
+  control_plane:
+    capm3:
+      hostSelector:
+        matchLabels:
+          cluster-role: control-plane
+      networks:
+        primary:
+          interface: eno1
+    network_interfaces:
+      eno1:
+        type: phy
+
+  machine_deployments:
+    du:
+      replicas: 1
+      node_class: ran-du
+      capm3:
+        hostSelector:
+          matchLabels:
+            cluster-role: du
+        networks:
+          primary:
+            interface: eno1
+      network_interfaces:
+        eno1:
+          type: phy
+        ens1f0:                           # fronthaul port (SR-IOV PF), MAC pinned in baremetal_hosts.du-1.interface_mappings
+          type: phy
+        ens1f1:                           # PTP port, MAC pinned in baremetal_hosts.du-1.interface_mappings
+          type: phy
+
+  baremetal_host_default:
+    bmh_spec:
+      bmc:
+        disableCertificateVerification: true
+      bootMode: UEFI
+      rootDeviceHints:
+        deviceName: /dev/sda
+
+  baremetal_hosts:
+    du-cp-1:
+      bmh_metadata: {labels: {cluster-role: control-plane}}
+      bmh_spec:
+        bmc: {address: redfish-virtualmedia://10.0.1.31/redfish/v1/Systems/1}
+        bootMACAddress: aa:bb:cc:00:00:31
+    du-1:
+      bmh_metadata: {labels: {cluster-role: du}}
+      interface_mappings:                 # MACs from the BIOS/BMC; Sylva finds each port by MAC, not by name
+        eno1:   {mac_address: "aa:bb:cc:00:00:32"}   # CHANGE_ME: node network
+        ens1f0: {mac_address: "aa:bb:cc:00:01:00"}   # CHANGE_ME: fronthaul
+        ens1f1: {mac_address: "aa:bb:cc:00:01:01"}   # CHANGE_ME: PTP
+      bmh_spec:
+        bmc: {address: redfish-virtualmedia://10.0.1.32/redfish/v1/Systems/1}
+        bootMACAddress: aa:bb:cc:00:00:32
+
+proxies:
+  http_proxy: ""
+  https_proxy: ""
+  no_proxy: ""

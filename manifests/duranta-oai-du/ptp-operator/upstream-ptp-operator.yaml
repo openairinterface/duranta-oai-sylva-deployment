@@ -1,0 +1,2192 @@
+# SPDX-License-Identifier: Apache-2.0
+# Generated, unmodified, from https://github.com/k8snetworkplumbingwg/ptp-operator commit 4c9223a
+# with: FREE_RUN=1 make deploy  (cat _free-run/deploy-default.yaml _free-run/deploy-custom.yaml)
+apiVersion: v1
+kind: Namespace
+metadata:
+  annotations:
+    workload.openshift.io/allowed: management
+  labels:
+    name: openshift-ptp
+    openshift.io/cluster-monitoring: "true"
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/warn: privileged
+    security.openshift.io/scc.podSecurityLabelSync: "false"
+  name: openshift-ptp
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.18.0
+  name: hardwareconfigs.ptp.openshift.io
+spec:
+  group: ptp.openshift.io
+  names:
+    kind: HardwareConfig
+    listKind: HardwareConfigList
+    plural: hardwareconfigs
+    singular: hardwareconfig
+  scope: Namespaced
+  versions:
+  - name: v2alpha1
+    schema:
+      openAPIV3Schema:
+        description: HardwareConfig is the Schema for the hardwareconfigs API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: HardwareConfigSpec defines the desired state of HardwareConfig
+            properties:
+              profile:
+                description: Profile contains the hardware profile with its configuration
+                properties:
+                  clockChain:
+                    description: ClockChain contains the complete clock chain configuration
+                      for this profile
+                    properties:
+                      behavior:
+                        description: |-
+                          Behavior defines the system behavior based on synchronization sources, conditions and
+                          associated actions. The conditions for the sources can be "init", "locked" or "lost".
+                          The "init" condition initializes the hardware in each subsystem to allow the "Acquiring" state.
+                          Bidirectional links between different subsystems can remain disconnected, as the desired link
+                          direction is still unknown. The "locked" condition in one of the subsystems will configure
+                          the bidirectional links to be disciplined by the locked subsystem. If more than one subsystem
+                          is locked, the source with the smaller index will have higher priority. If the active source
+                          is lost, and no other sources are "locked", the subsystem of the last active source may enter
+                          holdover (subject to the daemon holdover decision). Other subsystems will be connected to
+                          follow the DPLL in holdover.
+                        properties:
+                          conditions:
+                            description: Conditions define behavior rules that evaluate
+                              sources and apply desired states when triggered.
+                            items:
+                              description: |-
+                                Condition defines a condition that evaluates an array of source states with implicit AND logic between them.
+                                The first trigger in the array is the primary triggering condition, while all others are supporting conditions
+                                (that must be true for the desired states to be applied). For example, if two different subsystems have
+                                two different sources, there is still only one subsystem that will activate holdover if all other sources are lost.
+                              properties:
+                                desiredStates:
+                                  description: |-
+                                    DesiredStates is a list of pin and connector settings that together define the desired state.
+                                    The configurations are applied (in the order they are listed) when the condition is triggered.
+                                  items:
+                                    description: |-
+                                      DesiredState defines the desired configuration that is applied when a condition is triggered.
+                                      It supports DPLL pin configurations and standardized PTP pin/period configurations.
+                                    properties:
+                                      dpll:
+                                        description: DPLL defines DPLL pin configurations
+                                          for the subsystem
+                                        properties:
+                                          boardLabel:
+                                            description: |-
+                                              BoardLabel identifies the specific DPLL pin within the subsystem,
+                                              together with an optional external connector, if defined.
+                                              If the pin is routed through an external connector, the connector settings (direction, frequency, etc.)
+                                              are derived from the pin configuration.
+                                            type: string
+                                          eec:
+                                            description: EEC defines the desired state
+                                              for the Enhanced Ethernet Clock pin
+                                            properties:
+                                              priority:
+                                                description: Priority is the pin input
+                                                  priority (for input pins only)
+                                                format: int64
+                                                type: integer
+                                              state:
+                                                description: 'State is the pin desired
+                                                  state. Valid values: "connected",
+                                                  "disconnected", "selectable"'
+                                                type: string
+                                            type: object
+                                          pps:
+                                            description: PPS defines the desired state
+                                              for the Pulse Per Second pin
+                                            properties:
+                                              priority:
+                                                description: Priority is the pin input
+                                                  priority (for input pins only)
+                                                format: int64
+                                                type: integer
+                                              state:
+                                                description: 'State is the pin desired
+                                                  state. Valid values: "connected",
+                                                  "disconnected", "selectable"'
+                                                type: string
+                                            type: object
+                                          subsystem:
+                                            description: |-
+                                              Subsystem references the subsystem name from structure[].name.
+                                              Identifies which subsystem to configure.
+                                            type: string
+                                        type: object
+                                      ptpPeriod:
+                                        description: PTPPeriod defines a standardized
+                                          PTP periodic output configuration.
+                                        properties:
+                                          description:
+                                            description: Description provides optional
+                                              context about this PTP period configuration
+                                            type: string
+                                          index:
+                                            description: Index is the period index
+                                            format: int64
+                                            type: integer
+                                          period:
+                                            description: |-
+                                              Period defines the period duration.
+                                              If omitted, defaults to {sec: 0, nsec: 0}.
+                                            properties:
+                                              nsec:
+                                                description: Nsec is the nanoseconds
+                                                  component of the time specification
+                                                  (0-999999999)
+                                                format: int64
+                                                type: integer
+                                              sec:
+                                                description: Sec is the seconds component
+                                                  of the time specification
+                                                format: int64
+                                                type: integer
+                                            required:
+                                            - nsec
+                                            - sec
+                                            type: object
+                                          sourceName:
+                                            description: |-
+                                              SourceName specifies which source to use for obtaining interface names.
+                                              If specified, the interface names will be taken from the PTP source's ptpTimeReceivers field.
+                                              If not specified, all available PTP sources will be considered for interface name resolution.
+                                            type: string
+                                          start:
+                                            description: |-
+                                              Start defines the start time for the periodic output.
+                                              If omitted, defaults to {sec: 0, nsec: 0} (start immediately).
+                                            properties:
+                                              nsec:
+                                                description: Nsec is the nanoseconds
+                                                  component of the time specification
+                                                  (0-999999999)
+                                                format: int64
+                                                type: integer
+                                              sec:
+                                                description: Sec is the seconds component
+                                                  of the time specification
+                                                format: int64
+                                                type: integer
+                                            required:
+                                            - nsec
+                                            - sec
+                                            type: object
+                                        required:
+                                        - index
+                                        type: object
+                                      ptpPin:
+                                        description: PTPPin defines a standardized
+                                          PTP pin configuration.
+                                        properties:
+                                          chan:
+                                            description: Chan is the pin channel number
+                                            format: int64
+                                            type: integer
+                                          description:
+                                            description: Description provides optional
+                                              context about this PTP pin configuration
+                                            type: string
+                                          func:
+                                            description: 'Func is the pin function.
+                                              Valid values: "Disabled", "RX", "TX",
+                                              "Sync"'
+                                            type: string
+                                          name:
+                                            description: |-
+                                              Name is the pin name as appears under /sys/class/net/{interface}/device/ptp/ptp*/pins/
+                                              (e.g., SMA1, SMA2, SDP0, SDP2, U.FL1, U.FL2)
+                                            type: string
+                                          sourceName:
+                                            description: |-
+                                              SourceName specifies which source to use for obtaining interface names.
+                                              If specified, the interface names will be taken from the PTP source's ptpTimeReceivers field.
+                                              If not specified, all available PTP sources will be considered for interface name resolution.
+                                            type: string
+                                        required:
+                                        - chan
+                                        - func
+                                        - name
+                                        type: object
+                                    type: object
+                                  type: array
+                                name:
+                                  description: Name is a human-readable condition
+                                    name
+                                  type: string
+                                triggers:
+                                  description: |-
+                                    Triggers is an array of source state conditions that must ALL be true (implicit AND operation).
+                                    The first trigger in the array is the primary triggering condition, while all others are supporting conditions.
+                                  items:
+                                    description: SourceState represents the state
+                                      of a source in a condition evaluation.
+                                    properties:
+                                      conditionType:
+                                        description: |-
+                                          ConditionType is the state condition of the source.
+                                          Valid values: "default", "locked", "lost"
+                                        type: string
+                                      sourceName:
+                                        description: SourceName is the name of the
+                                          source being evaluated
+                                        type: string
+                                    required:
+                                    - conditionType
+                                    - sourceName
+                                    type: object
+                                  type: array
+                              required:
+                              - desiredStates
+                              - name
+                              - triggers
+                              type: object
+                            type: array
+                          sources:
+                            description: |-
+                              Sources of frequency, phase and time reference. Sources are identified by subsystem name and board label,
+                              tying them to the specific subsystem entity. Sources are characterized by type and can be referenced
+                              system-wide by the name.
+                            items:
+                              description: |-
+                                SourceConfig defines a source of frequency, phase and time reference.
+                                Sources are identified by subsystem name and board label, tying them to the specific subsystem entity.
+                                Sources are characterized by type and can be referenced system-wide by the name.
+                              properties:
+                                boardLabel:
+                                  description: BoardLabel and subsystem together unambiguously
+                                    identify the subsystem and the DPLL pin receiving
+                                    the source
+                                  type: string
+                                gnssConfig:
+                                  description: |-
+                                    GNSSConfig specifies the configuration for the GNSS source
+                                    (required if the sourceType is set to 'gnss')
+                                  properties:
+                                    init:
+                                      description: GNSSInit defines all user-configurable
+                                        UBLX configuration commands for this GNSS
+                                        source
+                                      properties:
+                                        antennaVoltage:
+                                          default: true
+                                          description: AntennaVoltage controls whether
+                                            the antenna voltage is enabled or not
+                                            (CFG-HW-ANT_CFG_VOLTCTRL)
+                                          type: boolean
+                                        constellations:
+                                          default:
+                                          - GPS
+                                          description: Constellations is the list
+                                            of constellations to apply
+                                          items:
+                                            description: ConstellationID is a single
+                                              GPS constellation identifier string
+                                            enum:
+                                            - GPS
+                                            - Galileo
+                                            - GLONASS
+                                            - BeiDou
+                                            - SBAS
+                                            type: string
+                                          type: array
+                                          x-kubernetes-list-type: set
+                                        extraCommands:
+                                          description: ExtraCommands allows user addition
+                                            of arbitrary ubxtool commands
+                                          items:
+                                            description: UBLXCommand allows arbitrary
+                                              addition of ubxtool commands.
+                                            properties:
+                                              args:
+                                                description: 'Args are the actual
+                                                  commandline arguments to pass to
+                                                  ubxtool  Note: Protocol ''-P'' is
+                                                  autodetected'
+                                                items:
+                                                  type: string
+                                                type: array
+                                              reportOutput:
+                                                description: Record will record the
+                                                  resulting output in the object status
+                                                  when true
+                                                type: boolean
+                                            required:
+                                            - args
+                                            type: object
+                                          type: array
+                                        survey:
+                                          description: SurveyIn encodes the SURVEYIN
+                                            parameters to begin the initial GNSS survey
+                                            at initialization
+                                          properties:
+                                            accuracy:
+                                              description: Accuracy is the accuracy
+                                                threshold, in meters, that will end
+                                                the survey
+                                              minimum: 0
+                                              type: integer
+                                            observationTime:
+                                              description: |-
+                                                ObservationTime specifies the maximum time in seconds we run the GPS SURVEY operation
+                                                Setting to 0 disables GPS survey
+                                              minimum: 0
+                                              type: integer
+                                          required:
+                                          - accuracy
+                                          - observationTime
+                                          type: object
+                                      required:
+                                      - antennaVoltage
+                                      - survey
+                                      type: object
+                                    match:
+                                      description: Match defines a mechanism to find
+                                        a GNSS device on the system.  If omitted,
+                                        autodetects the best-available GNSS source
+                                      properties:
+                                        ethernetInterface:
+                                          description: EthernetInterface defines the
+                                            GNSS device as the one attached to the
+                                            physical ethernet device name listed
+                                          type: string
+                                        ttyDevice:
+                                          description: TTYDevice defines the GNSS
+                                            device by its /dev/xxxx character device
+                                            path
+                                          type: string
+                                      type: object
+                                      x-kubernetes-validations:
+                                      - message: Exactly one of ttyDevice or ethernetInterface
+                                          must be provided.
+                                        rule: has(self.ttyDevice) != has(self.ethernetInterface)
+                                  required:
+                                  - init
+                                  type: object
+                                name:
+                                  description: Name is the source name that must be
+                                    unique system-wide
+                                  type: string
+                                ptpTimeReceivers:
+                                  description: |-
+                                    PTPTimeReceivers are ports configured to act as PTP time receivers
+                                    (required if the sourceType is set to 'ptpTimeReceiver')
+                                  items:
+                                    type: string
+                                  type: array
+                                sourceType:
+                                  description: |-
+                                    SourceType identifies the source type. Valid values: "ptpTimeReceiver", "gnss", "dpllPhaseLocked"
+                                    If sourceType is ptpTimeReceiver, ptpTimeReceivers must be specified.
+                                    If sourceType is gnss, gnssConfig must be specified.
+                                  enum:
+                                  - ptpTimeReceiver
+                                  - gnss
+                                  - dpllPhaseLocked
+                                  type: string
+                                subsystem:
+                                  description: |-
+                                    Subsystem references the subsystem name from structure[].name.
+                                    The subsystem's network interface will be used to derive the clock ID.
+                                  type: string
+                              required:
+                              - name
+                              - sourceType
+                              - subsystem
+                              type: object
+                            type: array
+                        type: object
+                      commonDefinitions:
+                        description: |-
+                          CommonDefinitions includes definitions applied to multiple entities within the chain,
+                          such as ESync configurations. They can be referenced in the relevant entities by name,
+                          to avoid multiple copies.
+                        properties:
+                          eSyncDefinitions:
+                            description: |-
+                              ESyncDefinitions is an array of named eSync configurations that can be referenced
+                              by name from pin configurations throughout the system.
+                            items:
+                              description: ESyncDefinition defines a named eSync configuration
+                                that can be referenced by name from pin configurations.
+                              properties:
+                                eSyncConfig:
+                                  description: ESyncConfig contains the eSync feature
+                                    configuration parameters
+                                  properties:
+                                    dutyCyclePct:
+                                      description: 'DutyCyclePct is the phase signal
+                                        pulse duty cycle in percent. If omitted, set
+                                        to 25%. Default: 25'
+                                      format: int64
+                                      type: integer
+                                    embeddedSyncFrequency:
+                                      description: 'EmbeddedSyncFrequency is the embedded
+                                        sync frequency in Hz. If omitted, set to 1Hz
+                                        (1PPS). Default: 1'
+                                      format: int64
+                                      type: integer
+                                    transferFrequency:
+                                      description: TransferFrequency is the configurable
+                                        transfer frequency in Hz (required)
+                                      format: int64
+                                      type: integer
+                                  required:
+                                  - transferFrequency
+                                  type: object
+                                name:
+                                  description: Name is a unique identifier for this
+                                    eSync configuration
+                                  type: string
+                              required:
+                              - eSyncConfig
+                              - name
+                              type: object
+                            type: array
+                          refSyncDefinitions:
+                            description: |-
+                              RefSyncDefinitions is an array of named reference sync configurations that can be
+                              referenced by name from pin configurations throughout the system.
+                              A ref-sync configuration typically ties a reference sync definition to a specific
+                              related pin or board label.
+                            items:
+                              description: |-
+                                RefSyncDefinition defines a named reference sync configuration that can be
+                                referenced by name from pin configurations. It optionally relates to a specific
+                                pin board label.
+                              properties:
+                                name:
+                                  description: Name is a unique identifier for this
+                                    ref-sync configuration
+                                  type: string
+                                relatedPinBoardLabel:
+                                  description: RelatedPinBoardLabel is an optional
+                                    label for a related pin/board
+                                  type: string
+                              required:
+                              - name
+                              type: object
+                            type: array
+                        type: object
+                      structure:
+                        description: |-
+                          Structure defines the system structure as a list of atomic synchronization subsystems.
+                          Must contain at least one subsystem.
+                        items:
+                          description: |-
+                            Subsystem defines an atomic synchronization subsystem of a single DPLL and one or more Ethernet subsystems linked together.
+                            Each subsystem represents a cohesive unit that can operate independently or in coordination with other subsystems.
+                          properties:
+                            dpll:
+                              description: |-
+                                DPLL contains the DPLL configuration for this subsystem
+                                When clockType is specified, this can be omitted and will be derived from ptpProfile and vendor defaults.
+                              properties:
+                                frequencyInputs:
+                                  additionalProperties:
+                                    description: |-
+                                      PinConfig represents pin configuration for DPLL phase or frequency signals in a dictionary format
+                                      (boardLabel is the key). The frequency and esyncConfigName properties are mutually exclusive.
+                                    properties:
+                                      connector:
+                                        description: |-
+                                          Connector is an optional identifier on the device (e.g., "SMA1", "U.FL2").
+                                          Defines the physical connector this pin is statically or dynamically routed to.
+                                          Used by the hardware plugin software to configure connector logic, if present.
+                                        type: string
+                                      description:
+                                        description: Description is an optional description
+                                          for this pin configuration
+                                        type: string
+                                      eSyncConfigName:
+                                        description: |-
+                                          ESyncConfigName is an optional eSync configuration name (defined in CommonDefinitions).
+                                          Mutually exclusive with frequency.
+                                        type: string
+                                      frequency:
+                                        description: |-
+                                          Frequency is the frequency value in Hz (for frequency pins) or phase reference frequency
+                                          (for phase pins, defaults to 1 PPS). Mutually exclusive with esyncConfigName.
+                                        format: int64
+                                        type: integer
+                                      phaseAdjustment:
+                                        description: PhaseAdjustment is optional phase
+                                          adjustment in picoseconds
+                                        format: int64
+                                        type: integer
+                                      referenceSync:
+                                        description: |-
+                                          ReferenceSync applies to frequency pins that can be paired to a phase pin by board label
+                                          The value should match a phase pin label (from phaseInputs) within the same subsystem
+                                        type: string
+                                    type: object
+                                  description: FrequencyInputs are optional frequency
+                                    reference inputs, keyed by board label
+                                  type: object
+                                frequencyOutputs:
+                                  additionalProperties:
+                                    description: |-
+                                      PinConfig represents pin configuration for DPLL phase or frequency signals in a dictionary format
+                                      (boardLabel is the key). The frequency and esyncConfigName properties are mutually exclusive.
+                                    properties:
+                                      connector:
+                                        description: |-
+                                          Connector is an optional identifier on the device (e.g., "SMA1", "U.FL2").
+                                          Defines the physical connector this pin is statically or dynamically routed to.
+                                          Used by the hardware plugin software to configure connector logic, if present.
+                                        type: string
+                                      description:
+                                        description: Description is an optional description
+                                          for this pin configuration
+                                        type: string
+                                      eSyncConfigName:
+                                        description: |-
+                                          ESyncConfigName is an optional eSync configuration name (defined in CommonDefinitions).
+                                          Mutually exclusive with frequency.
+                                        type: string
+                                      frequency:
+                                        description: |-
+                                          Frequency is the frequency value in Hz (for frequency pins) or phase reference frequency
+                                          (for phase pins, defaults to 1 PPS). Mutually exclusive with esyncConfigName.
+                                        format: int64
+                                        type: integer
+                                      phaseAdjustment:
+                                        description: PhaseAdjustment is optional phase
+                                          adjustment in picoseconds
+                                        format: int64
+                                        type: integer
+                                      referenceSync:
+                                        description: |-
+                                          ReferenceSync applies to frequency pins that can be paired to a phase pin by board label
+                                          The value should match a phase pin label (from phaseInputs) within the same subsystem
+                                        type: string
+                                    type: object
+                                  description: FrequencyOutputs are optional frequency
+                                    outputs for other devices or measurements, keyed
+                                    by board label
+                                  type: object
+                                holdoverParameters:
+                                  description: HoldoverParameters defines the combination
+                                    of the DPLL complex hardware parameters and the
+                                    holdover specification threshold.
+                                  properties:
+                                    localHoldoverTimeout:
+                                      description: |-
+                                        LocalHoldoverTimeout is the time the clock will stay in the holdover state before reaching the
+                                        LocalMaxHoldoverOffset (in seconds). Default - 14400s
+                                      format: int64
+                                      type: integer
+                                    localMaxHoldoverOffset:
+                                      description: LocalMaxHoldoverOffset is the maximum
+                                        holdover offset in nanoseconds. Default -
+                                        1500ns
+                                      format: int64
+                                      type: integer
+                                    maxInSpecOffset:
+                                      description: MaxInSpecOffset is the holdover
+                                        specification threshold in nanoseconds. Default
+                                        - 100ns
+                                      format: int64
+                                      type: integer
+                                  type: object
+                                networkInterface:
+                                  description: |-
+                                    NetworkInterface identifies the network interface of the subsystem.
+                                    The clock ID will be derived from this interface's MAC address.
+                                    If omitted, the hardware must support clock ID discovery from the first ethernet port.
+                                  type: string
+                                phaseInputs:
+                                  additionalProperties:
+                                    description: |-
+                                      PinConfig represents pin configuration for DPLL phase or frequency signals in a dictionary format
+                                      (boardLabel is the key). The frequency and esyncConfigName properties are mutually exclusive.
+                                    properties:
+                                      connector:
+                                        description: |-
+                                          Connector is an optional identifier on the device (e.g., "SMA1", "U.FL2").
+                                          Defines the physical connector this pin is statically or dynamically routed to.
+                                          Used by the hardware plugin software to configure connector logic, if present.
+                                        type: string
+                                      description:
+                                        description: Description is an optional description
+                                          for this pin configuration
+                                        type: string
+                                      eSyncConfigName:
+                                        description: |-
+                                          ESyncConfigName is an optional eSync configuration name (defined in CommonDefinitions).
+                                          Mutually exclusive with frequency.
+                                        type: string
+                                      frequency:
+                                        description: |-
+                                          Frequency is the frequency value in Hz (for frequency pins) or phase reference frequency
+                                          (for phase pins, defaults to 1 PPS). Mutually exclusive with esyncConfigName.
+                                        format: int64
+                                        type: integer
+                                      phaseAdjustment:
+                                        description: PhaseAdjustment is optional phase
+                                          adjustment in picoseconds
+                                        format: int64
+                                        type: integer
+                                      referenceSync:
+                                        description: |-
+                                          ReferenceSync applies to frequency pins that can be paired to a phase pin by board label
+                                          The value should match a phase pin label (from phaseInputs) within the same subsystem
+                                        type: string
+                                    type: object
+                                  description: PhaseInputs are phase reference input
+                                    pins, keyed by board label
+                                  type: object
+                                phaseOutputs:
+                                  additionalProperties:
+                                    description: |-
+                                      PinConfig represents pin configuration for DPLL phase or frequency signals in a dictionary format
+                                      (boardLabel is the key). The frequency and esyncConfigName properties are mutually exclusive.
+                                    properties:
+                                      connector:
+                                        description: |-
+                                          Connector is an optional identifier on the device (e.g., "SMA1", "U.FL2").
+                                          Defines the physical connector this pin is statically or dynamically routed to.
+                                          Used by the hardware plugin software to configure connector logic, if present.
+                                        type: string
+                                      description:
+                                        description: Description is an optional description
+                                          for this pin configuration
+                                        type: string
+                                      eSyncConfigName:
+                                        description: |-
+                                          ESyncConfigName is an optional eSync configuration name (defined in CommonDefinitions).
+                                          Mutually exclusive with frequency.
+                                        type: string
+                                      frequency:
+                                        description: |-
+                                          Frequency is the frequency value in Hz (for frequency pins) or phase reference frequency
+                                          (for phase pins, defaults to 1 PPS). Mutually exclusive with esyncConfigName.
+                                        format: int64
+                                        type: integer
+                                      phaseAdjustment:
+                                        description: PhaseAdjustment is optional phase
+                                          adjustment in picoseconds
+                                        format: int64
+                                        type: integer
+                                      referenceSync:
+                                        description: |-
+                                          ReferenceSync applies to frequency pins that can be paired to a phase pin by board label
+                                          The value should match a phase pin label (from phaseInputs) within the same subsystem
+                                        type: string
+                                    type: object
+                                  description: PhaseOutputs are optional phase output
+                                    pins, keyed by board label
+                                  type: object
+                              type: object
+                            ethernet:
+                              description: Ethernet defines one or more Ethernet subsystems
+                                associated with this synchronization subsystem
+                              items:
+                                description: |-
+                                  Ethernet defines the Ethernet subsystem and unambiguously identifies Ethernet ports belonging to it.
+                                  This may be required to support various port naming schemes.
+                                properties:
+                                  ports:
+                                    description: |-
+                                      Ports is a list of Ethernet port names associated with this Ethernet subsystem.
+                                      The default port, or the port used to address the network adapter configuration through sysfs, is listed first.
+                                      When clockType is specified, this can be omitted and will be derived from ptpconfig leading interfaces.
+                                    items:
+                                      type: string
+                                    type: array
+                                type: object
+                              type: array
+                            hardwareSpecificDefinitions:
+                              description: HardwareSpecificDefinitions is the hardware-specific
+                                identifier that handles default configurations
+                              type: string
+                            name:
+                              description: Name is a human-readable identifier for
+                                this subsystem
+                              type: string
+                          required:
+                          - name
+                          type: object
+                        type: array
+                    required:
+                    - structure
+                    type: object
+                  clockType:
+                    description: |-
+                      ClockType specifies the clock mode: "T-BC", "T-GM", or "APTS"
+                      When specified, behavior templates are loaded from vendor defaults based on
+                      each subsystem's hardwareSpecificDefinitions and resolved with user-provided overrides.
+                      If not specified, the behavior section must be explicitly provided in ClockChain.
+                    type: string
+                  description:
+                    description: Description provides optional context about this
+                      hardware profile
+                    type: string
+                  name:
+                    description: Name is the unique identifier for this hardware profile
+                    type: string
+                required:
+                - clockChain
+                - name
+                type: object
+              relatedPtpProfileName:
+                description: RelatedPtpProfileName specifies the name of the related
+                  PTP profile
+                type: string
+            required:
+            - profile
+            type: object
+          status:
+            description: HardwareConfigStatus defines the observed state of HardwareConfig
+            properties:
+              matchedNodes:
+                description: |-
+                  MatchedNodes contains the list of nodes that have been matched to this hardware config
+                  based on PTP profile recommendations
+                items:
+                  description: MatchedNode represents a node that has been matched
+                    to this hardware config
+                  properties:
+                    nodeName:
+                      description: NodeName is the name of the matched node
+                      type: string
+                    ptpProfile:
+                      description: PtpProfile is the PTP profile that was recommended
+                        for this node
+                      type: string
+                  required:
+                  - nodeName
+                  - ptpProfile
+                  type: object
+                type: array
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.18.0
+  name: nodeptpdevices.ptp.openshift.io
+spec:
+  group: ptp.openshift.io
+  names:
+    kind: NodePtpDevice
+    listKind: NodePtpDeviceList
+    plural: nodeptpdevices
+    singular: nodeptpdevice
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.conditions[?(@.type=="Ready")].status
+      name: Ready
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1
+    schema:
+      openAPIV3Schema:
+        description: NodePtpDevice is the Schema for the nodeptpdevices API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: NodePtpDeviceSpec defines the desired state of NodePtpDevice
+            type: object
+          status:
+            description: NodePtpDeviceStatus defines the observed state of NodePtpDevice
+            properties:
+              baseBoardInfo:
+                description: |-
+                  BaseBoardInfo contains the base board DMI/SMBIOS information for the node.
+                  This includes the base board manufacturer, product name, version, and serial number.
+                properties:
+                  manufacturer:
+                    description: Manufacturer is the base board manufacturer from
+                      SMBIOS
+                    type: string
+                  productName:
+                    description: ProductName is the base board product name from SMBIOS
+                    type: string
+                  serialNumber:
+                    description: SerialNumber is the base board serial number from
+                      SMBIOS
+                    type: string
+                  version:
+                    description: Version is the base board version from SMBIOS
+                    type: string
+                type: object
+              conditions:
+                description: |-
+                  Conditions represent the latest available observations of the NodePtpDevice's state.
+                  Known condition types are: "Ready".
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              devices:
+                description: |-
+                  PtpDevice represents a PTP device available in the cluster node.
+                  This struct contains information about the device, including its name and profile.
+                items:
+                  properties:
+                    hardwareInfo:
+                      description: HardwareInfo contains detailed hardware identification
+                        information for the device.
+                      properties:
+                        deviceID:
+                          description: DeviceID is the PCI device identifier
+                          type: string
+                        driverVersion:
+                          description: DriverVersion is the version of the kernel
+                            driver in use
+                          type: string
+                        fec:
+                          description: FEC is the Forward Error Correction mode in
+                            use
+                          type: string
+                        firmwareVersion:
+                          description: FirmwareVersion is the version of the device
+                            firmware
+                          type: string
+                        linkSpeed:
+                          description: LinkSpeed is the negotiated link speed
+                          type: string
+                        linkStatus:
+                          description: LinkStatus indicates whether the link is up
+                            ("up") or down ("down")
+                          type: string
+                        pciAddress:
+                          description: PCIAddress is the PCI bus address
+                          type: string
+                        subsystemDeviceID:
+                          description: SubsystemDeviceID is the PCI subsystem device
+                            identifier
+                          type: string
+                        subsystemVendorID:
+                          description: SubsystemVendorID is the PCI subsystem vendor
+                            identifier
+                          type: string
+                        vendorID:
+                          description: VendorID is the PCI vendor identifier
+                          type: string
+                        vpdIdentifierString:
+                          description: VPDIdentifierString is the device identifier
+                            string from VPD
+                          type: string
+                        vpdManufacturerID:
+                          description: VPDManufacturerID is the manufacturer identifier
+                            from VPD
+                          type: string
+                        vpdPartNumber:
+                          description: VPDPartNumber is the manufacturer's part number
+                            from VPD
+                          type: string
+                        vpdProductName:
+                          description: VPDProductName is the product name from VPD
+                            (V0 field)
+                          type: string
+                        vpdSerialNumber:
+                          description: VPDSerialNumber is the unique serial number
+                            from VPD
+                          type: string
+                        vpdVendorSpecific1:
+                          description: |-
+                            VPDVendorSpecific1 is vendor-specific data from VPD (V1 field).
+                            Often contains detailed product identification useful for hardware fingerprinting.
+                          type: string
+                        vpdVendorSpecific2:
+                          description: VPDVendorSpecific2 is vendor-specific data
+                            from VPD (V2 field)
+                          type: string
+                      type: object
+                    name:
+                      description: |-
+                        Name is the name of the PTP device.
+                        It is a unique identifier for the device.
+                      type: string
+                    profile:
+                      description: |-
+                        Profile is the PTP profile associated with the device.
+                        This profile defines the PTP configuration settings for the device.
+                      type: string
+                  type: object
+                type: array
+              hwconfig:
+                description: |-
+                  HwConfig represents the hardware configuration for a device in the cluster.
+                  This struct contains information about the device's identification and status,
+                  as well as its specific configuration settings.
+                items:
+                  properties:
+                    config:
+                      description: |-
+                        Config contains the configuration settings for the hardware device.
+                        This is a JSON object that holds the device-specific configuration.
+                      x-kubernetes-preserve-unknown-fields: true
+                    deviceID:
+                      description: DeviceID is the unique identifier for the hardware
+                        device.
+                      type: string
+                    failed:
+                      description: |-
+                        Failed indicates whether the hardware configuration has failed.
+                        A value of true means the configuration has failed.
+                      type: boolean
+                    status:
+                      description: Status provides a descriptive status of the hardware
+                        device's configuration.
+                      type: string
+                    vendorID:
+                      description: VendorID is the identifier for the vendor of the
+                        hardware device.
+                      type: string
+                  type: object
+                type: array
+              sync:
+                description: |-
+                  Sync contains the current PTP synchronization snapshot for this node.
+                  Updated by the linuxptp-daemon on state transitions and periodic heartbeats.
+                properties:
+                  profiles:
+                    description: Profiles lists the applied profiles and their inferred
+                      clock types on this node.
+                    items:
+                      description: NodeProfileStatus reports the clock type of a single
+                        profile running on this node.
+                      properties:
+                        clockType:
+                          description: ClockType is T-GM, T-BC, BC, or OC. Written
+                            by linuxptp-daemon at apply.
+                          type: string
+                        name:
+                          description: 'Name is the fully qualified profile name:
+                            <ptpconfigName>_<profileName>.'
+                          type: string
+                      required:
+                      - name
+                      type: object
+                    type: array
+                type: object
+              systemInfo:
+                description: |-
+                  SystemInfo contains the system-level DMI/SMBIOS information for the node.
+                  This includes the system manufacturer, product name, version, serial number, SKU, and family.
+                properties:
+                  family:
+                    description: Family is the system family from SMBIOS
+                    type: string
+                  manufacturer:
+                    description: Manufacturer is the system manufacturer from SMBIOS
+                    type: string
+                  productName:
+                    description: ProductName is the system product name from SMBIOS
+                    type: string
+                  serialNumber:
+                    description: SerialNumber is the system serial number from SMBIOS
+                    type: string
+                  skuNumber:
+                    description: SKUNumber is the system SKU number from SMBIOS
+                    type: string
+                  version:
+                    description: Version is the system version from SMBIOS
+                    type: string
+                type: object
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.18.0
+  name: ptpconfigs.ptp.openshift.io
+spec:
+  group: ptp.openshift.io
+  names:
+    kind: PtpConfig
+    listKind: PtpConfigList
+    plural: ptpconfigs
+    singular: ptpconfig
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.conditions[?(@.type=="ProfileReferenceValid")].status
+      name: Refs Valid
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1
+    schema:
+      openAPIV3Schema:
+        description: PtpConfig is the Schema for the ptpconfigs API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: PtpConfigSpec defines the desired state of PtpConfig
+            properties:
+              profile:
+                items:
+                  properties:
+                    chronydConf:
+                      type: string
+                    chronydOpts:
+                      type: string
+                    interface:
+                      type: string
+                    name:
+                      type: string
+                    phc2sysConf:
+                      type: string
+                    phc2sysOpts:
+                      type: string
+                    plugins:
+                      additionalProperties:
+                        x-kubernetes-preserve-unknown-fields: true
+                      type: object
+                    ptp4lConf:
+                      type: string
+                    ptp4lOpts:
+                      type: string
+                    ptpClockThreshold:
+                      properties:
+                        holdOverTimeout:
+                          default: 5
+                          description: clock state to stay in holdover state in secs
+                          format: int64
+                          type: integer
+                        maxOffsetThreshold:
+                          default: 100
+                          description: max offset in nano secs
+                          format: int64
+                          type: integer
+                        minOffsetThreshold:
+                          description: |-
+                            DEPRECATED: min offset in nano secs. This field is no longer used for offset-range evaluation; the system now evaluates abs(offset) against maxOffsetThreshold only. The field is retained for backward compatibility with existing PtpConfig resources and its value is ignored. Do not set this field in new configurations.
+                            Deprecated: MinOffsetThreshold is no longer used for offset-range evaluation; abs(offset) < MaxOffsetThreshold is evaluated instead.
+                          format: int64
+                          type: integer
+                        processDowntimeThresholds:
+                          description: Acceptable process downtime in seconds for
+                            each process
+                          properties:
+                            chronyd:
+                              default: 5
+                              description: Acceptable downtime for chronyd process
+                                in seconds (max 1 day)
+                              maximum: 86400
+                              minimum: 0
+                              type: integer
+                            gpsd:
+                              default: 1
+                              description: Acceptable downtime for gpsd process in
+                                seconds (max 1 day)
+                              maximum: 86400
+                              minimum: 0
+                              type: integer
+                            gpspipe:
+                              default: 1
+                              description: Acceptable downtime for gpspipe process
+                                in seconds (max 1 day)
+                              maximum: 86400
+                              minimum: 0
+                              type: integer
+                            phc2sys:
+                              default: 5
+                              description: Acceptable downtime for phc2sys process
+                                in seconds (max 1 day)
+                              maximum: 86400
+                              minimum: 0
+                              type: integer
+                            ptp4l:
+                              default: 5
+                              description: Acceptable downtime for ptp4l process in
+                                seconds (max 1 day)
+                              maximum: 86400
+                              minimum: 0
+                              type: integer
+                            synce4l:
+                              default: 5
+                              description: Acceptable downtime for synce4l process
+                                in seconds (max 1 day)
+                              maximum: 86400
+                              minimum: 0
+                              type: integer
+                            ts2phc:
+                              default: 5
+                              description: Acceptable downtime for ts2phc process
+                                in seconds (max 1 day)
+                              maximum: 86400
+                              minimum: 0
+                              type: integer
+                          type: object
+                        sysOffsetInSyncThreshold:
+                          description: sysOffsetInSyncThreshold is the phc2sys-to-CLOCK_REALTIME
+                            offset threshold, in nanoseconds, that must be met to
+                            gate the OS Clock Sync (E3) LOCKED state. abs(offset)
+                            <= this threshold for sysOffsetSamples consecutive samples
+                            triggers LOCKED. When unset, it defaults to maxOffsetThreshold.
+                          format: int64
+                          minimum: 0
+                          type: integer
+                        sysOffsetOutOfSyncThreshold:
+                          description: sysOffsetOutOfSyncThreshold is the phc2sys-to-CLOCK_REALTIME
+                            offset threshold, in nanoseconds, that when exceeded gates
+                            the OS Clock Sync (E3) FREERUN state. abs(offset) > this
+                            threshold for sysOffsetSamples consecutive samples triggers
+                            FREERUN. Independent of sysOffsetInSyncThreshold; together
+                            they form a hysteresis band. When unset, it defaults to
+                            maxOffsetThreshold.
+                          format: int64
+                          minimum: 0
+                          type: integer
+                        sysOffsetSamples:
+                          description: sysOffsetSamples is the number of consecutive
+                            phc2sys offset samples required for an E3 LOCKED/FREERUN
+                            state transition in either direction (relative to sysOffsetInSyncThreshold
+                            for LOCKED, or sysOffsetOutOfSyncThreshold for FREERUN).
+                            When unset, it defaults to 10.
+                          format: int64
+                          minimum: 1
+                          type: integer
+                      type: object
+                    ptpSchedulingPolicy:
+                      enum:
+                      - SCHED_OTHER
+                      - SCHED_FIFO
+                      type: string
+                    ptpSchedulingPriority:
+                      format: int64
+                      maximum: 65
+                      minimum: 1
+                      type: integer
+                    ptpSettings:
+                      additionalProperties:
+                        type: string
+                      description: |-
+                        PtpSettings holds free-form, string-typed configuration knobs validated individually
+                        by the PtpConfig admission webhook. Recognized keys include (non-exhaustive):
+                          - logReduce: log reduction mode ('true', 'false', 'basic', 'enhanced').
+                          - inSyncConditionThreshold: ptp4l offset threshold (ns) used by the T-BC state machine.
+                          - inSyncConditionTimes: number of consecutive in-sync samples before T-BC reports LOCKED.
+                          - stdoutFilter: regexp filtering ptp4l/phc2sys stdout.
+                      type: object
+                    synce4lConf:
+                      type: string
+                    synce4lOpts:
+                      type: string
+                    ts2phcConf:
+                      type: string
+                    ts2phcOpts:
+                      type: string
+                  required:
+                  - name
+                  type: object
+                type: array
+              recommend:
+                items:
+                  properties:
+                    match:
+                      items:
+                        properties:
+                          nodeLabel:
+                            type: string
+                          nodeName:
+                            type: string
+                        type: object
+                      type: array
+                    priority:
+                      format: int64
+                      type: integer
+                    profile:
+                      type: string
+                  required:
+                  - priority
+                  - profile
+                  type: object
+                type: array
+            required:
+            - profile
+            - recommend
+            type: object
+          status:
+            description: PtpConfigStatus defines the observed state of PtpConfig
+            properties:
+              conditions:
+                description: |-
+                  Conditions represent the latest available observations of the PtpConfig's state.
+                  Known condition types are: "ProfileReferenceValid".
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              matchList:
+                description: MatchList contains the nodes matched by this PtpConfig's
+                  recommend rules.
+                items:
+                  properties:
+                    nodeName:
+                      type: string
+                    profile:
+                      description: 'Profile is the fully qualified profile name: <ptpconfigName>_<profileName>.'
+                      type: string
+                  required:
+                  - nodeName
+                  - profile
+                  type: object
+                type: array
+              observedGeneration:
+                description: ObservedGeneration is the most recent generation observed
+                  by the controller.
+                format: int64
+                type: integer
+              profileStatuses:
+                description: ProfileStatuses reports the relationship and apply state
+                  of each profile in this PtpConfig.
+                items:
+                  description: ProfileStatus reports the relationship and apply state
+                    of a single profile within this PtpConfig.
+                  properties:
+                    appliedOnNodes:
+                      description: |-
+                        AppliedOnNodes lists the nodes where the linuxptp-daemon has applied this profile.
+                        This is observed from NodePtpDevice.status.sync.profiles, not from matchList.
+                      items:
+                        type: string
+                      type: array
+                    clockType:
+                      description: ClockType is T-GM, T-BC, BC, or OC. Written by
+                        linuxptp-daemon at apply.
+                      type: string
+                    controlledBy:
+                      description: ControlledBy is the fully qualified name of the
+                        profile that controls this one.
+                      type: string
+                    controls:
+                      description: Controls lists the fully qualified names of profiles
+                        this one controls (reverse of controllingProfile).
+                      items:
+                        type: string
+                      type: array
+                    haMembers:
+                      description: HaMembers lists the fully qualified names of profiles
+                        coordinated by this HA profile.
+                      items:
+                        type: string
+                      type: array
+                    hardwareConfigs:
+                      description: HardwareConfigs lists HardwareConfig CRs whose
+                        relatedPtpProfileName refers to this profile.
+                      items:
+                        type: string
+                      type: array
+                    hasPhc2sys:
+                      description: HasPhc2sys is true if this profile has phc2sysOpts
+                        configured (syncs system clock).
+                      type: boolean
+                    name:
+                      description: 'Name is the fully qualified profile name: <ptpconfigName>_<profileName>.'
+                      type: string
+                    partOfHa:
+                      description: |-
+                        PartOfHa is the fully qualified name of the HA coordinator profile this one belongs to.
+                        Empty if not part of HA.
+                      type: string
+                  required:
+                  - hasPhc2sys
+                  - name
+                  type: object
+                type: array
+              warnings:
+                description: Warnings contains any detected misconfigurations (e.g.,
+                  multiple profiles with phc2sys on same node).
+                items:
+                  type: string
+                type: array
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.18.0
+  name: ptpoperatorconfigs.ptp.openshift.io
+spec:
+  group: ptp.openshift.io
+  names:
+    kind: PtpOperatorConfig
+    listKind: PtpOperatorConfigList
+    plural: ptpoperatorconfigs
+    singular: ptpoperatorconfig
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - description: Event Enabled
+      jsonPath: .spec.ptpEventConfig.enableEventPublisher
+      name: Event Enabled
+      type: boolean
+    name: v1
+    schema:
+      openAPIV3Schema:
+        description: PtpOperatorConfig is the Schema for the ptpoperatorconfigs API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: PtpOperatorConfigSpec defines the desired state of PtpOperatorConfig.
+            properties:
+              daemonNodeSelector:
+                additionalProperties:
+                  type: string
+                description: |-
+                  DaemonNodeSelector specifies the node selector for the linuxptp daemon.
+                  This is a map of key-value pairs used to select the nodes where the
+                  linuxptp daemon will run.
+                  If empty {}, the linuxptp daemon will be deployed on each node of the cluster.
+                type: object
+              plugins:
+                additionalProperties:
+                  x-kubernetes-preserve-unknown-fields: true
+                description: |-
+                  EnabledPlugins is a map of plugin names to their configuration settings.
+                  Each entry in the map specifies the configuration for a specific plugin.
+                  This field is optional and can be omitted if no plugins are enabled.
+                type: object
+              ptpEventConfig:
+                description: |-
+                  EventConfig contains the configuration settings for the PTP event sidecar.
+                  This field is optional and can be omitted if event sidecar configuration is not required.
+                properties:
+                  apiVersion:
+                    description: |-
+                      ApiVersion is used to determine which API is used for the event service
+                      1.0: default version. event service is mapped to internal REST-API.
+                      2.x: event service is mapped to O-RAN v3.0 Compliant O-Cloud Notification REST-API.
+                    type: string
+                  enableEventPublisher:
+                    default: false
+                    description: EnableEventPublisher will deploy event proxy as a
+                      sidecar
+                    type: boolean
+                  storageType:
+                    description: StorageType is the type of storage to store subscription
+                      data
+                    type: string
+                  transportHost:
+                    description: |-
+                      TransportHost format is <protocol>://<transport-service>.<namespace>.svc.cluster.local:<transport-port>
+                      Example HTTP transport: "http://ptp-event-publisher-service-NODE_NAME.openshift-ptp.svc.cluster.local:9043"
+                    type: string
+                type: object
+            required:
+            - daemonNodeSelector
+            type: object
+          status:
+            description: PtpOperatorConfigStatus defines the observed state of PtpOperatorConfig
+            type: object
+        type: object
+        x-kubernetes-validations:
+        - message: PtpOperatorConfig is a singleton, metadata.name must be 'default'
+          rule: self.metadata.name == 'default'
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ptp-operator
+  namespace: openshift-ptp
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: daemonsets-manager-role
+  namespace: openshift-ptp
+rules:
+- apiGroups:
+  - apps
+  resources:
+  - daemonsets
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+  - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: leader-election-role
+  namespace: openshift-ptp
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: secrets-manager-role
+  namespace: openshift-ptp
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: manager-role
+rules:
+- apiGroups:
+  - config.openshift.io
+  resources:
+  - apiservers
+  - infrastructures
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - networking.k8s.io
+  resources:
+  - networkpolicies
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ptp.openshift.io
+  resources:
+  - hardwareconfigs
+  - ptpconfigs
+  - ptpoperatorconfigs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ptp.openshift.io
+  resources:
+  - hardwareconfigs/finalizers
+  - ptpconfigs/finalizers
+  - ptpoperatorconfigs/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - ptp.openshift.io
+  resources:
+  - hardwareconfigs/status
+  - ptpconfigs/status
+  - ptpoperatorconfigs/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - ptp.openshift.io
+  resources:
+  - nodeptpdevices
+  verbs:
+  - create
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: daemonsets-manager-rolebinding
+  namespace: openshift-ptp
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: daemonsets-manager-role
+subjects:
+- kind: ServiceAccount
+  name: ptp-operator
+  namespace: openshift-ptp
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: leader-election-rolebinding
+  namespace: openshift-ptp
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: leader-election-role
+subjects:
+- kind: ServiceAccount
+  name: ptp-operator
+  namespace: openshift-ptp
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: secrets-manager-rolebinding
+  namespace: openshift-ptp
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: secrets-manager-role
+subjects:
+- kind: ServiceAccount
+  name: ptp-operator
+  namespace: openshift-ptp
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: manager-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: manager-role
+subjects:
+- kind: ServiceAccount
+  name: ptp-operator
+  namespace: openshift-ptp
+---
+apiVersion: v1
+data:
+  controller_manager_config.yaml: |
+    apiVersion: controller-runtime.sigs.k8s.io/v1alpha1
+    kind: ControllerManagerConfig
+    health:
+      healthProbeBindAddress: :8081
+    metrics:
+      bindAddress: 127.0.0.1:8080
+    webhook:
+      port: 9443
+    leaderElection:
+      leaderElect: true
+      resourceName: c5793dcc.openshift.io
+kind: ConfigMap
+metadata:
+  name: manager-config
+  namespace: openshift-ptp
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    service.beta.openshift.io/serving-cert-secret-name: webhook-server-cert
+  name: webhook-service
+  namespace: openshift-ptp
+spec:
+  ports:
+  - port: 443
+    protocol: TCP
+    targetPort: 9443
+  selector:
+    name: ptp-operator
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    service.beta.openshift.io/serving-cert-secret-name: webhook-server-cert
+  name: ptp-operator
+  namespace: openshift-ptp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: ptp-operator
+  template:
+    metadata:
+      annotations:
+        service.beta.openshift.io/serving-cert-secret-name: webhook-server-cert
+        target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+      labels:
+        name: ptp-operator
+        role: ptp
+    spec:
+      containers:
+      - args:
+        - --enable-leader-election
+        - --logtostderr
+        - --stderrthreshold=INFO
+        command:
+        - ptp-operator
+        env:
+        - name: OPERATOR_NAME
+          value: ptp-operator
+        - name: RELEASE_VERSION
+          value: v5.0.0
+        - name: LINUXPTP_DAEMON_IMAGE
+          value: quay.io/openshift/origin-ptp:5.0
+        - name: KUBE_RBAC_PROXY_IMAGE
+          value: quay.io/openshift/origin-kube-rbac-proxy:5.0
+        - name: SIDECAR_EVENT_IMAGE
+          value: quay.io/openshift/origin-cloud-event-proxy:5.0
+        - name: EVENT_PROXY_IMAGE
+          value: ""
+        - name: LINUXPTP_VERBOSITY
+          value: "10"
+        - name: OPERATOR_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: WATCH_NAMESPACE
+          value: ""
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        image: ghcr.io/k8snetworkplumbingwg/ptp-operator:5.0
+        imagePullPolicy: IfNotPresent
+        name: ptp-operator
+        ports:
+        - containerPort: 9443
+          name: webhook-server
+          protocol: TCP
+        resources:
+          requests:
+            cpu: 50m
+            memory: 100Mi
+        volumeMounts:
+        - mountPath: /tmp/k8s-webhook-server/serving-certs
+          name: cert
+          readOnly: true
+      nodeSelector:
+        node-role.kubernetes.io/master: ""
+      priorityClassName: system-node-critical
+      serviceAccountName: ptp-operator
+      tolerations:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/master
+        operator: Exists
+      volumes:
+      - name: cert
+        secret:
+          defaultMode: 420
+          secretName: webhook-server-cert
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: ptpconfig-minoffsetthreshold-deprecation
+  namespace: openshift-ptp
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+    - apiGroups:
+      - ptp.openshift.io
+      apiVersions:
+      - v1
+      operations:
+      - CREATE
+      - UPDATE
+      resources:
+      - ptpconfigs
+  validations:
+  - expression: |-
+      !object.spec.profile.exists(p,
+
+        has(p.ptpClockThreshold) &&
+        has(p.ptpClockThreshold.minOffsetThreshold) &&
+        p.ptpClockThreshold.minOffsetThreshold != 0)
+    message: minOffsetThreshold is deprecated and ignored; the system now evaluates
+      abs(offset) < maxOffsetThreshold only. Remove minOffsetThreshold from this PtpConfig's
+      ptpClockThreshold.
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: ptpconfig-minoffsetthreshold-deprecation-binding
+  namespace: openshift-ptp
+spec:
+  matchResources:
+    resourceRules:
+    - apiGroups:
+      - ptp.openshift.io
+      apiVersions:
+      - v1
+      operations:
+      - CREATE
+      - UPDATE
+      resources:
+      - ptpconfigs
+  policyName: ptpconfig-minoffsetthreshold-deprecation
+  validationActions:
+  - Warn
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  annotations:
+    service.beta.openshift.io/inject-cabundle: "true"
+  name: ptpconfig-validating-webhook-configuration
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: openshift-ptp
+      path: /validate-ptp-openshift-io-v1-ptpconfig
+  failurePolicy: Fail
+  name: vptpconfig.kb.io
+  rules:
+  - apiGroups:
+    - ptp.openshift.io
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - ptpconfigs
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: openshift-ptp
+      path: /validate-ptp-openshift-io-v1-ptpoperatorconfig
+  failurePolicy: Fail
+  name: vptpoperatorconfig.kb.io
+  rules:
+  - apiGroups:
+    - ptp.openshift.io
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - ptpoperatorconfigs
+  sideEffects: None
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: linuxptp-daemon
+  namespace: openshift-ptp
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: linuxptp-daemon
+  namespace: openshift-ptp
+rules:
+- apiGroups:
+  - security.openshift.io
+  resourceNames:
+  - privileged
+  resources:
+  - securitycontextconstraints
+  verbs:
+  - use
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ptp-operator
+  namespace: openshift-ptp
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - '*'
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - '*'
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - '*'
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  verbs:
+  - '*'
+- apiGroups:
+  - ""
+  resources:
+  - services
+  verbs:
+  - '*'
+- apiGroups:
+  - ""
+  resources:
+  - serviceaccounts
+  verbs:
+  - '*'
+- apiGroups:
+  - apps
+  resources:
+  - daemonsets
+  verbs:
+  - '*'
+- apiGroups:
+  - apps
+  resources:
+  - replicasets
+  verbs:
+  - '*'
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - '*'
+- apiGroups:
+  - ptp.openshift.io
+  resources:
+  - '*'
+  verbs:
+  - '*'
+- apiGroups:
+  - monitoring.coreos.com
+  resources:
+  - servicemonitors
+  verbs:
+  - '*'
+- apiGroups:
+  - monitoring.coreos.com
+  resources:
+  - prometheusrules
+  verbs:
+  - '*'
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - roles
+  verbs:
+  - '*'
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - rolebindings
+  verbs:
+  - '*'
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: linuxptp-daemon
+rules:
+- apiGroups:
+  - ptp.openshift.io
+  resources:
+  - '*'
+  verbs:
+  - '*'
+- apiGroups:
+  - authentication.k8s.io
+  resources:
+  - tokenreviews
+  verbs:
+  - create
+- apiGroups:
+  - authorization.k8s.io
+  resources:
+  - subjectaccessreviews
+  verbs:
+  - create
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - '*'
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - '*'
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: linuxptp-daemon
+  namespace: openshift-ptp
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: linuxptp-daemon
+subjects:
+- kind: ServiceAccount
+  name: linuxptp-daemon
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: linuxptp-daemon
+  namespace: openshift-ptp
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: linuxptp-daemon
+subjects:
+- kind: ServiceAccount
+  name: linuxptp-daemon
+  namespace: openshift-ptp
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ptp-operator
+  namespace: openshift-ptp
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ptp-operator
+subjects:
+- kind: ServiceAccount
+  name: ptp-operator
+  namespace: openshift-ptp

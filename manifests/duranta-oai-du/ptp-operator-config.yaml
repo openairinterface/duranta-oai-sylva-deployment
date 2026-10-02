@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: MIT
+# Run the linuxptp daemon only on DU nodes (RKE2 workers have no node-role.kubernetes.io/worker label)
+apiVersion: ptp.openshift.io/v1
+kind: PtpOperatorConfig
+metadata:
+  name: default
+  namespace: openshift-ptp
+spec:
+  daemonNodeSelector:
+    oai.ran/du: "true"

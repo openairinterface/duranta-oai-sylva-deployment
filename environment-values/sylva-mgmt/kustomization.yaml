@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: Apache-2.0
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../base
+
+labels:
+- includeSelectors: true
+  pairs:
+    copy-from-bootstrap-to-management: ""
+
+configMapGenerator:
+- name: sylva-units-values
+  behavior: merge
+  files:
+  - values=values.yaml
+
+secretGenerator:
+- name: sylva-units-secrets
+  behavior: merge
+  files:
+  - secrets=secrets.yaml
