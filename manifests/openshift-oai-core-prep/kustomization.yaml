@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: MIT
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: oai-core
+resources:
+  - namespace.yaml
+  - ../registry-pull-secret        # Secret regcred
